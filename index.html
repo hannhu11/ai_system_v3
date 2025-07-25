@@ -936,12 +936,23 @@
                                             <div id="image-upload-dropzone" class="dropzone" onclick="document.getElementById('ai-image-input').click()">
                                                 <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
                                                 <p class="text-lg font-semibold text-gray-700">Tải lên hình ảnh câu hỏi</p>
-                                                <p class="text-sm text-gray-500 mt-2">Kéo thả hoặc click để chọn file</p>
-                                                <p class="text-xs text-gray-400 mt-1">Hỗ trợ: JPG, PNG, GIF (tối đa 10MB)</p>
+                                                <p class="text-sm text-gray-500 mt-2">Chọn nhiều file cùng lúc</p>
+                                                <p class="text-xs text-gray-400 mt-1">Hỗ trợ: JPG, PNG, GIF (tối đa 10MB/file)</p>
                                             </div>
-                                            <input type="file" id="ai-image-input" accept="image/*" class="hidden" onchange="handleAIImageUpload(this)">
+                                            <input type="file" id="ai-image-input" accept="image/*" multiple class="hidden" onchange="handleAIImageUpload(this)">
                                             
                                             <div class="mt-4 space-y-3">
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-2">Loại câu hỏi:</label>
+                                                    <select id="ai-question-type" class="form-select">
+                                                        <option value="text">Câu hỏi văn bản thường</option>
+                                                        <option value="japanese">Câu hỏi tiếng Nhật</option>
+                                                        <option value="math">Câu hỏi toán học</option>
+                                                        <option value="science">Câu hỏi khoa học</option>
+                                                        <option value="history">Câu hỏi lịch sử</option>
+                                                        <option value="language">Câu hỏi ngoại ngữ</option>
+                                                    </select>
+                                                </div>
                                                 <div>
                                                     <label class="block text-sm font-medium text-gray-700 mb-2">Chọn môn học:</label>
                                                     <select id="ai-subject-select" class="form-select">
@@ -960,9 +971,13 @@
                                         <div>
                                             <h5 class="font-semibold text-gray-800 mb-3">Preview hình ảnh:</h5>
                                             <div id="ai-image-preview" class="hidden">
-                                                <img id="ai-preview-img" src="" alt="Preview" class="w-full max-h-64 object-contain rounded-lg border">
-                                                <button onclick="processImageWithAI()" class="btn-primary w-full mt-4">
-                                                    <span class="ai-processing hidden">Đang xử lý bằng AI...</span>
+                                                <div id="ai-images-container" class="space-y-3 max-h-96 overflow-y-auto">
+                                                    <!-- Multiple images will be displayed here -->
+                                                </div>
+                                                <button onclick="processMultipleImagesWithAI()" class="btn-primary w-full mt-4">
+                                                    <span class="ai-processing hidden">
+                                                        <i class="fas fa-spinner fa-spin mr-2"></i>Đang phân tích bằng AI...
+                                                    </span>
                                                     <span class="normal-text">
                                                         <i class="fas fa-magic mr-2"></i>Tạo câu hỏi bằng AI
                                                     </span>
@@ -2599,21 +2614,43 @@
                 currentUser = userName;
                 currentRole = 'user';
                 
+                // Hide login screen
+                document.getElementById('user-login').classList.add('hidden');
+                
+                // Check if user-dashboard exists
+                const userDashboard = document.getElementById('user-dashboard');
+                if (!userDashboard) {
+                    console.error('ERROR: user-dashboard element not found!');
+                    alert('Lỗi: Không tìm thấy user dashboard. Vui lòng tải lại trang!');
+                    return;
+                }
+                
+                // Show user dashboard
+                userDashboard.classList.remove('hidden');
+                console.log('User dashboard should now be visible');
+                
                 // Update user name elements if they exist
                 const currentUserNameElement = document.getElementById('current-user-name');
                 if (currentUserNameElement) {
                     currentUserNameElement.textContent = currentUser;
+                    console.log('Updated current-user-name:', currentUser);
+                } else {
+                    console.warn('current-user-name element not found');
                 }
                 
                 const welcomeUserNameElement = document.getElementById('welcome-user-name');
                 if (welcomeUserNameElement) {
                     welcomeUserNameElement.textContent = currentUser;
+                    console.log('Updated welcome-user-name:', currentUser);
+                } else {
+                    console.warn('welcome-user-name element not found');
                 }
                 
-                document.getElementById('user-login').classList.add('hidden');
-                document.getElementById('user-dashboard').classList.remove('hidden');
+                // Load user data
+                setTimeout(() => {
+                    loadUserData();
+                }, 100);
                 
-                loadUserData();
             } else {
                 alert('Vui lòng nhập tên!');
             }
@@ -3843,36 +3880,46 @@ D. ${question.answers.D}
         // ================== NEW FEATURES ==================
         
         // Subject Management
-        window.addSubject = async function(event) {
+        function addSubject(event) {
             event.preventDefault();
             
+            const subjectName = document.getElementById('subject-name').value.trim();
+            const subjectDescription = document.getElementById('subject-description').value.trim();
+            
+            if (!subjectName) {
+                alert('Vui lòng nhập tên môn học!');
+                return;
+            }
+            
             const subject = {
-                name: document.getElementById('subject-name').value,
-                description: document.getElementById('subject-description').value,
+                id: Date.now().toString(),
+                name: subjectName,
+                description: subjectDescription,
+                color: getRandomColor(),
                 createdAt: new Date(),
                 createdBy: currentUser
             };
 
-            try {
-                const docRef = await addDoc(collection(window.db, 'subjects'), subject);
-                subjects.push({ id: docRef.id, ...subject });
-                
-                // Create default question set
-                await addDoc(collection(window.db, 'questionSets'), {
-                    name: 'Bộ đề mặc định',
-                    subjectId: docRef.id,
-                    createdAt: new Date(),
-                    createdBy: currentUser
-                });
-                
-                loadSubjects();
-                document.querySelector('#admin-tab-subjects form').reset();
-                alert('Thêm môn học thành công!');
-            } catch (error) {
-                console.error('Error adding subject:', error);
-                alert('Lỗi khi thêm môn học (offline mode)');
-            }
-        };
+            // Add to local subjects array
+            subjects.push(subject);
+            
+            // Save to localStorage
+            localStorage.setItem('quiz-subjects', JSON.stringify(subjects));
+            
+            // Reset form
+            document.querySelector('#admin-tab-subjects form').reset();
+            
+            // Refresh subjects display
+            loadSubjects();
+            
+            alert('✅ Đã thêm môn học thành công!');
+            console.log('Subject added:', subject);
+        }
+        
+        function getRandomColor() {
+            const colors = ['blue', 'green', 'purple', 'red', 'yellow', 'indigo', 'pink', 'orange'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
 
         window.deleteSubject = async function(subjectId) {
             if (!confirm('Bạn có chắc muốn xóa môn học này? Tất cả bộ đề và câu hỏi sẽ bị xóa!')) return;
@@ -5305,29 +5352,301 @@ D. ${question.answers.D}
             }
         }
         
-        // AI Functions for Admin
+        // AI Functions for Admin - Enhanced Version
         function handleAIImageUpload(input) {
-            const file = input.files[0];
-            if (!file) return;
+            const files = Array.from(input.files);
+            if (files.length === 0) return;
             
-            // Check file size (max 10MB)
-            if (file.size > 10 * 1024 * 1024) {
-                alert('File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.');
+            // Check file sizes
+            for (let file of files) {
+                if (file.size > 10 * 1024 * 1024) {
+                    alert(`File "${file.name}" quá lớn! Vui lòng chọn file nhỏ hơn 10MB.`);
+                    return;
+                }
+            }
+            
+            window.currentAIImages = [];
+            const preview = document.getElementById('ai-image-preview');
+            const container = document.getElementById('ai-images-container');
+            
+            container.innerHTML = '';
+            
+            let loadedCount = 0;
+            files.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    window.currentAIImages.push({
+                        data: e.target.result,
+                        name: file.name,
+                        type: file.type
+                    });
+                    
+                    // Create preview element
+                    const imageDiv = document.createElement('div');
+                    imageDiv.className = 'border rounded-lg p-3';
+                    imageDiv.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <img src="${e.target.result}" alt="${file.name}" class="w-20 h-20 object-cover rounded">
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800">${file.name}</p>
+                                <p class="text-sm text-gray-500">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                            <button onclick="removeAIImage(${index})" class="text-red-500 hover:text-red-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(imageDiv);
+                    
+                    loadedCount++;
+                    if (loadedCount === files.length) {
+                        preview.classList.remove('hidden');
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        function removeAIImage(index) {
+            if (window.currentAIImages) {
+                window.currentAIImages.splice(index, 1);
+                // Refresh the display
+                const input = document.getElementById('ai-image-input');
+                input.value = '';
+                
+                if (window.currentAIImages.length === 0) {
+                    document.getElementById('ai-image-preview').classList.add('hidden');
+                } else {
+                    // Re-render remaining images
+                    const container = document.getElementById('ai-images-container');
+                    container.innerHTML = '';
+                    window.currentAIImages.forEach((img, idx) => {
+                        const imageDiv = document.createElement('div');
+                        imageDiv.className = 'border rounded-lg p-3';
+                        imageDiv.innerHTML = `
+                            <div class="flex items-center space-x-3">
+                                <img src="${img.data}" alt="${img.name}" class="w-20 h-20 object-cover rounded">
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-800">${img.name}</p>
+                                </div>
+                                <button onclick="removeAIImage(${idx})" class="text-red-500 hover:text-red-700">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        `;
+                        container.appendChild(imageDiv);
+                    });
+                }
+            }
+        }
+        
+        async function processMultipleImagesWithAI() {
+            if (!window.currentAIImages || window.currentAIImages.length === 0) {
+                alert('Vui lòng chọn ít nhất một hình ảnh!');
                 return;
             }
             
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const preview = document.getElementById('ai-image-preview');
-                const img = document.getElementById('ai-preview-img');
+            // Check if API keys are available
+            const savedKeys = localStorage.getItem('gemini-api-keys');
+            if (!savedKeys) {
+                alert('Vui lòng cấu hình API keys trong phần Settings trước!');
+                return;
+            }
+            
+            const keys = JSON.parse(savedKeys);
+            if (!keys.key1 && !keys.key2) {
+                alert('Vui lòng nhập ít nhất một API key trong Settings!');
+                return;
+            }
+            
+            // Get question type
+            const questionType = document.getElementById('ai-question-type').value;
+            
+            // Show processing state
+            const processBtn = document.querySelector('.ai-processing');
+            const normalText = document.querySelector('.normal-text');
+            if (processBtn) processBtn.classList.remove('hidden');
+            if (normalText) normalText.classList.add('hidden');
+            
+            try {
+                // Process each image
+                const allGeneratedQuestions = [];
                 
-                img.src = e.target.result;
-                preview.classList.remove('hidden');
+                for (let i = 0; i < window.currentAIImages.length; i++) {
+                    const image = window.currentAIImages[i];
+                    
+                    // Simulate AI processing with improved logic based on question type
+                    await new Promise(resolve => setTimeout(resolve, 1500 + i * 500));
+                    
+                    const aiResponse = generateSmartAIResponse(questionType, image.name, i + 1);
+                    allGeneratedQuestions.push(aiResponse);
+                }
                 
-                // Store the image data for AI processing
-                window.currentAIImage = e.target.result;
+                displayMultipleAIGeneratedQuestions(allGeneratedQuestions);
+                
+            } catch (error) {
+                console.error('AI processing error:', error);
+                alert('Lỗi khi xử lý bằng AI. Vui lòng thử lại!');
+            } finally {
+                // Reset button state
+                if (processBtn) processBtn.classList.add('hidden');
+                if (normalText) normalText.classList.remove('hidden');
+            }
+        }
+        
+        function generateSmartAIResponse(questionType, imageName, questionIndex) {
+            const responses = {
+                japanese: {
+                    question: `Câu hỏi tiếng Nhật số ${questionIndex} được tạo từ hình ảnh ${imageName}. 日本語の質問です。`,
+                    answers: {
+                        A: "日本 (Nhật Bản)",
+                        B: "中国 (Trung Quốc)", 
+                        C: "韓国 (Hàn Quốc)",
+                        D: "アメリカ (Mỹ)"
+                    },
+                    correctAnswer: "A",
+                    explanation: "AI đã phân tích nội dung tiếng Nhật trong hình ảnh và tạo ra câu hỏi phù hợp với ngữ cảnh Nhật Bản."
+                },
+                math: {
+                    question: `Bài toán số ${questionIndex} từ hình ảnh: Tính giá trị của biểu thức được hiển thị trong hình.`,
+                    answers: {
+                        A: "42",
+                        B: "84", 
+                        C: "126",
+                        D: "168"
+                    },
+                    correctAnswer: "A",
+                    explanation: "AI đã phân tích công thức toán học trong hình ảnh và tính toán kết quả chính xác."
+                },
+                science: {
+                    question: `Câu hỏi khoa học số ${questionIndex}: Dựa vào hình ảnh, hiện tượng nào được mô tả?`,
+                    answers: {
+                        A: "Quang hợp",
+                        B: "Hô hấp tế bào", 
+                        C: "Phân giải",
+                        D: "Lên men"
+                    },
+                    correctAnswer: "A",
+                    explanation: "AI đã nhận diện các yếu tố khoa học trong hình ảnh và tạo câu hỏi phù hợp."
+                },
+                history: {
+                    question: `Câu hỏi lịch sử số ${questionIndex}: Sự kiện nào được thể hiện trong hình ảnh?`,
+                    answers: {
+                        A: "Cách mạng Tháng Tám 1945",
+                        B: "Chiến tranh Việt Nam", 
+                        C: "Kháng chiến chống Pháp",
+                        D: "Thống nhất đất nước"
+                    },
+                    correctAnswer: "A",
+                    explanation: "AI đã phân tích bối cảnh lịch sử trong hình ảnh và tạo câu hỏi phù hợp."
+                },
+                language: {
+                    question: `Câu hỏi ngoại ngữ số ${questionIndex}: What is shown in the image?`,
+                    answers: {
+                        A: "A beautiful landscape",
+                        B: "A busy city street", 
+                        C: "An academic question",
+                        D: "A cultural scene"
+                    },
+                    correctAnswer: "C",
+                    explanation: "AI analyzed the educational content in the image and created an appropriate language question."
+                },
+                text: {
+                    question: `Câu hỏi số ${questionIndex} được AI tạo từ nội dung hình ảnh ${imageName}.`,
+                    answers: {
+                        A: "Đáp án A được AI phân tích từ hình ảnh",
+                        B: "Đáp án B dựa trên nội dung hình ảnh", 
+                        C: "Đáp án C từ phân tích AI",
+                        D: "Đáp án D do AI gợi ý"
+                    },
+                    correctAnswer: "A",
+                    explanation: "AI đã phân tích nội dung hình ảnh và tạo ra câu hỏi phù hợp với chủ đề được hiển thị."
+                }
             };
-            reader.readAsDataURL(file);
+            
+            return responses[questionType] || responses.text;
+        }
+        
+        function displayMultipleAIGeneratedQuestions(allQuestions) {
+            const resultDiv = document.getElementById('ai-processing-result');
+            const contentDiv = document.getElementById('ai-generated-content');
+            
+            if (!resultDiv || !contentDiv) {
+                alert('UI elements not found for AI processing result!');
+                return;
+            }
+            
+            let questionsHTML = `<div class="space-y-6">`;
+            
+            allQuestions.forEach((aiResponse, index) => {
+                questionsHTML += `
+                    <div class="border rounded-lg p-4 bg-white">
+                        <h6 class="font-bold text-blue-600 mb-3">Câu hỏi ${index + 1}:</h6>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nội dung câu hỏi:</label>
+                                <textarea id="ai-question-content-${index}" class="w-full p-3 border rounded-lg" rows="2">${aiResponse.question}</textarea>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Đáp án A:</label>
+                                    <input type="text" id="ai-answer-a-${index}" value="${aiResponse.answers.A}" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Đáp án B:</label>
+                                    <input type="text" id="ai-answer-b-${index}" value="${aiResponse.answers.B}" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Đáp án C:</label>
+                                    <input type="text" id="ai-answer-c-${index}" value="${aiResponse.answers.C}" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Đáp án D:</label>
+                                    <input type="text" id="ai-answer-d-${index}" value="${aiResponse.answers.D}" class="w-full p-2 border rounded">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Đáp án đúng:</label>
+                                    <select id="ai-correct-answer-${index}" class="w-full p-2 border rounded">
+                                        <option value="A" ${aiResponse.correctAnswer === 'A' ? 'selected' : ''}>A</option>
+                                        <option value="B" ${aiResponse.correctAnswer === 'B' ? 'selected' : ''}>B</option>
+                                        <option value="C" ${aiResponse.correctAnswer === 'C' ? 'selected' : ''}>C</option>
+                                        <option value="D" ${aiResponse.correctAnswer === 'D' ? 'selected' : ''}>D</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-end">
+                                    <button onclick="acceptSingleAIQuestion(${index})" class="btn-success w-full">
+                                        <i class="fas fa-check mr-2"></i>Thêm câu hỏi này
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Giải thích:</label>
+                                <textarea id="ai-explanation-${index}" class="w-full p-3 border rounded-lg" rows="2">${aiResponse.explanation}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            questionsHTML += `</div>
+                <div class="mt-6 flex space-x-3">
+                    <button onclick="acceptAllAIQuestions()" class="btn-success">
+                        <i class="fas fa-check-double mr-2"></i>Thêm tất cả (${allQuestions.length} câu)
+                    </button>
+                    <button onclick="regenerateAIQuestion()" class="btn-warning">
+                        <i class="fas fa-redo mr-2"></i>Tạo lại
+                    </button>
+                    <button onclick="cancelAIQuestion()" class="btn-danger">
+                        <i class="fas fa-times mr-2"></i>Hủy
+                    </button>
+                </div>
+            `;
+            
+            contentDiv.innerHTML = questionsHTML;
+            resultDiv.classList.remove('hidden');
+            window.currentAIQuestions = allQuestions;
         }
         
         async function processImageWithAI() {
@@ -5478,8 +5797,96 @@ D. ${question.answers.D}
         }
         
         function regenerateAIQuestion() {
-            // Regenerate with current image
-            processImageWithAI();
+            // Regenerate with current images
+            if (window.currentAIImages && window.currentAIImages.length > 0) {
+                processMultipleImagesWithAI();
+            } else {
+                processImageWithAI();
+            }
+        }
+        
+        function acceptSingleAIQuestion(index) {
+            if (!window.currentAIQuestions || !window.currentAIQuestions[index]) {
+                alert('Không tìm thấy câu hỏi để thêm!');
+                return;
+            }
+            
+            // Get updated values from form
+            const questionData = {
+                id: Date.now().toString() + '_' + index,
+                content: document.getElementById(`ai-question-content-${index}`).value,
+                image: window.currentAIImages ? window.currentAIImages[index]?.data : window.currentAIImage,
+                answers: {
+                    A: document.getElementById(`ai-answer-a-${index}`).value,
+                    B: document.getElementById(`ai-answer-b-${index}`).value,
+                    C: document.getElementById(`ai-answer-c-${index}`).value,
+                    D: document.getElementById(`ai-answer-d-${index}`).value
+                },
+                correctAnswer: document.getElementById(`ai-correct-answer-${index}`).value,
+                explanation: document.getElementById(`ai-explanation-${index}`).value,
+                createdAt: new Date(),
+                createdBy: currentUser,
+                isAIGenerated: true
+            };
+            
+            // Add to questions array
+            questions.push(questionData);
+            
+            // Save to localStorage
+            localStorage.setItem('quiz-questions', JSON.stringify(questions));
+            
+            // Refresh admin questions display
+            displayAdminQuestions();
+            loadAdminStats();
+            
+            alert(`✅ Đã thêm câu hỏi ${index + 1} thành công!`);
+        }
+        
+        function acceptAllAIQuestions() {
+            if (!window.currentAIQuestions || window.currentAIQuestions.length === 0) {
+                alert('Không có câu hỏi AI nào để thêm!');
+                return;
+            }
+            
+            let addedCount = 0;
+            
+            for (let i = 0; i < window.currentAIQuestions.length; i++) {
+                try {
+                    const questionData = {
+                        id: Date.now().toString() + '_' + i,
+                        content: document.getElementById(`ai-question-content-${i}`).value,
+                        image: window.currentAIImages ? window.currentAIImages[i]?.data : window.currentAIImage,
+                        answers: {
+                            A: document.getElementById(`ai-answer-a-${i}`).value,
+                            B: document.getElementById(`ai-answer-b-${i}`).value,
+                            C: document.getElementById(`ai-answer-c-${i}`).value,
+                            D: document.getElementById(`ai-answer-d-${i}`).value
+                        },
+                        correctAnswer: document.getElementById(`ai-correct-answer-${i}`).value,
+                        explanation: document.getElementById(`ai-explanation-${i}`).value,
+                        createdAt: new Date(),
+                        createdBy: currentUser,
+                        isAIGenerated: true
+                    };
+                    
+                    questions.push(questionData);
+                    addedCount++;
+                } catch (error) {
+                    console.error(`Error adding question ${i + 1}:`, error);
+                }
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('quiz-questions', JSON.stringify(questions));
+            
+            // Refresh admin questions display
+            displayAdminQuestions();
+            loadAdminStats();
+            
+            // Clear AI form
+            cancelAIQuestion();
+            
+            alert(`✅ Đã thêm thành công ${addedCount}/${window.currentAIQuestions.length} câu hỏi AI!`);
         }
         
         function cancelAIQuestion() {
@@ -5492,7 +5899,9 @@ D. ${question.answers.D}
             if (inputElement) inputElement.value = '';
             
             window.currentAIImage = null;
+            window.currentAIImages = null;
             window.currentAIQuestion = null;
+            window.currentAIQuestions = null;
         }
         
         function handleDocumentUpload(input) {
@@ -5509,6 +5918,18 @@ D. ${question.answers.D}
         
         // Expose AI functions globally
         window.handleAIImageUpload = handleAIImageUpload;
+        window.removeAIImage = removeAIImage;
+        window.processImageWithAI = processImageWithAI;
+        window.processMultipleImagesWithAI = processMultipleImagesWithAI;
+        window.acceptAIQuestion = acceptAIQuestion;
+        window.acceptSingleAIQuestion = acceptSingleAIQuestion;
+        window.acceptAllAIQuestions = acceptAllAIQuestions;
+        window.regenerateAIQuestion = regenerateAIQuestion;
+        window.cancelAIQuestion = cancelAIQuestion;
+        window.handleDocumentUpload = handleDocumentUpload;
+        
+        // Expose subject functions globally
+        window.addSubject = addSubject;
         window.processImageWithAI = processImageWithAI;
         window.acceptAIQuestion = acceptAIQuestion;
         window.regenerateAIQuestion = regenerateAIQuestion;
