@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 AI Quiz System - Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.8s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    
+    <!-- Login Screen -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 fade-in">
+            <div class="text-center mb-8">
+                <div class="text-6xl mb-4">🧠</div>
+                <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                    AI Quiz System
+                </h1>
+                <p class="text-gray-600">Hệ thống Trắc nghiệm AI Thông minh</p>
+                <p class="text-sm text-gray-500 mt-2">Test Version - GitHub Pages Ready</p>
+            </div>
+            
+            <div class="space-y-4">
+                <button onclick="showAdminLogin()" class="btn-success w-full">
+                    <i class="fas fa-cog mr-2"></i> Quản trị viên (Admin)
+                </button>
+                <button onclick="showUserLogin()" class="btn-primary w-full">
+                    <i class="fas fa-user mr-2"></i> Người dùng (User)
+                </button>
+            </div>
+            
+            <div class="mt-8 text-center">
+                <div class="text-xs text-gray-400 space-y-1">
+                    <p>✨ AI tự động tạo câu hỏi từ hình ảnh</p>
+                    <p>🤖 Giải thích thông minh bằng AI</p>
+                    <p>📊 Thống kê học tập cá nhân hóa</p>
+                    <p>🎯 Lộ trình học tập thích ứng</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login -->
+    <div id="admin-login" class="hidden min-h-screen flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 fade-in">
+            <div class="text-center mb-8">
+                <div class="text-5xl mb-4">⚙️</div>
+                <h2 class="text-3xl font-bold text-green-600 mb-2">Admin Portal</h2>
+                <p class="text-gray-600">Truy cập quản trị hệ thống</p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Mật khẩu Admin</label>
+                    <input type="password" id="admin-password" placeholder="Nhập mật khẩu: admin123" 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                </div>
+                <button onclick="adminLogin()" class="btn-success w-full">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Đăng nhập
+                </button>
+                <button onclick="backToMain()" class="btn-secondary w-full">
+                    <i class="fas fa-arrow-left mr-2"></i> Quay lại
+                </button>
+            </div>
+            
+            <div class="mt-6 p-4 bg-green-50 rounded-lg">
+                <h4 class="font-semibold text-green-800 mb-2">🔧 Tính năng Admin:</h4>
+                <ul class="text-sm text-green-700 space-y-1">
+                    <li>• Mật khẩu: <strong>admin123</strong></li>
+                    <li>• Tạo câu hỏi từ hình ảnh bằng AI</li>
+                    <li>• Quản lý môn học và bộ đề</li>
+                    <li>• Thống kê chi tiết người dùng</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Login -->
+    <div id="user-login" class="hidden min-h-screen flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 fade-in">
+            <div class="text-center mb-8">
+                <div class="text-5xl mb-4">👤</div>
+                <h2 class="text-3xl font-bold text-blue-600 mb-2">User Portal</h2>
+                <p class="text-gray-600">Bắt đầu hành trình học tập</p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Tên của bạn</label>
+                    <input type="text" id="user-name" placeholder="Ví dụ: Nguyễn Văn A" 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <button onclick="userLogin()" class="btn-primary w-full">
+                    <i class="fas fa-play mr-2"></i> Bắt đầu học tập
+                </button>
+                <button onclick="backToMain()" class="btn-secondary w-full">
+                    <i class="fas fa-arrow-left mr-2"></i> Quay lại
+                </button>
+            </div>
+            
+            <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h4 class="font-semibold text-blue-800 mb-2">🎯 Tính năng User:</h4>
+                <ul class="text-sm text-blue-700 space-y-1">
+                    <li>• Làm bài trắc nghiệm với AI hỗ trợ</li>
+                    <li>• Flashcards và Q&A Chatbot AI</li>
+                    <li>• Lộ trình học tập cá nhân hóa</li>
+                    <li>• Thống kê tiến độ chi tiết</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Messages -->
+    <div id="admin-success" class="hidden min-h-screen flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 fade-in text-center">
+            <div class="text-6xl mb-4">🎉</div>
+            <h2 class="text-3xl font-bold text-green-600 mb-4">Đăng nhập thành công!</h2>
+            <p class="text-gray-600 mb-6">Chào mừng Admin! Hệ thống đã sẵn sàng.</p>
+            <button onclick="backToMain()" class="btn-success">
+                <i class="fas fa-home mr-2"></i> Quay về trang chủ
+            </button>
+        </div>
+    </div>
+
+    <div id="user-success" class="hidden min-h-screen flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 fade-in text-center">
+            <div class="text-6xl mb-4">🎯</div>
+            <h2 class="text-3xl font-bold text-blue-600 mb-4">Chào mừng bạn!</h2>
+            <p class="text-gray-600 mb-2">Xin chào <span id="welcome-name" class="font-semibold text-blue-600"></span>!</p>
+            <p class="text-gray-600 mb-6">Bạn đã sẵn sàng để bắt đầu học tập.</p>
+            <button onclick="backToMain()" class="btn-primary">
+                <i class="fas fa-home mr-2"></i> Quay về trang chủ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        const ADMIN_PASSWORD = 'admin123';
+        
+        // Navigation functions
+        function showAdminLogin() {
+            console.log('Showing admin login...');
+            hideAll();
+            document.getElementById('admin-login').classList.remove('hidden');
+        }
+        
+        function showUserLogin() {
+            console.log('Showing user login...');
+            hideAll();
+            document.getElementById('user-login').classList.remove('hidden');
+        }
+        
+        function backToMain() {
+            console.log('Back to main...');
+            hideAll();
+            document.getElementById('login-screen').classList.remove('hidden');
+            
+            // Clear inputs
+            document.getElementById('admin-password').value = '';
+            document.getElementById('user-name').value = '';
+        }
+        
+        function hideAll() {
+            const screens = ['login-screen', 'admin-login', 'user-login', 'admin-success', 'user-success'];
+            screens.forEach(screen => {
+                document.getElementById(screen).classList.add('hidden');
+            });
+        }
+        
+        // Login functions
+        function adminLogin() {
+            const password = document.getElementById('admin-password').value;
+            console.log('Admin login attempt with password:', password);
+            
+            if (password === ADMIN_PASSWORD) {
+                console.log('Admin login successful!');
+                hideAll();
+                document.getElementById('admin-success').classList.remove('hidden');
+            } else {
+                alert('Mật khẩu không đúng! Thử: admin123');
+            }
+        }
+        
+        function userLogin() {
+            const userName = document.getElementById('user-name').value.trim();
+            console.log('User login attempt with name:', userName);
+            
+            if (userName) {
+                console.log('User login successful!');
+                document.getElementById('welcome-name').textContent = userName;
+                hideAll();
+                document.getElementById('user-success').classList.remove('hidden');
+            } else {
+                alert('Vui lòng nhập tên của bạn!');
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Test page loaded successfully!');
+            console.log('Functions available:');
+            console.log('- showAdminLogin:', typeof showAdminLogin);
+            console.log('- showUserLogin:', typeof showUserLogin);
+            console.log('- adminLogin:', typeof adminLogin);
+            console.log('- userLogin:', typeof userLogin);
+        });
+    </script>
+</body>
+</html>
