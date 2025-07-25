@@ -17,7 +17,7 @@
     <!-- Firebase -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
-        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
         import { getStorage } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
         
         const firebaseConfig = {
@@ -33,6 +33,13 @@
         window.firebaseApp = initializeApp(firebaseConfig);
         window.db = getFirestore(window.firebaseApp);
         window.storage = getStorage(window.firebaseApp);
+        
+        // Expose Firestore functions globally
+        window.firestore = {
+            collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy
+        };
+        
+        console.log('🔥 Firebase initialized successfully');
     </script>
     
     <style>
@@ -1467,12 +1474,6 @@
                                             </div>
                                             <div>
                                                 <label class="flex items-center">
-                                                    <input type="checkbox" id="enable-offline-mode" class="mr-2">
-                                                    <span>Hỗ trợ chế độ offline</span>
-                                                </label>
-                                            </div>
-                                            <div>
-                                                <label class="flex items-center">
                                                     <input type="checkbox" id="enable-gamification" checked class="mr-2">
                                                     <span>Bật tính năng gamification</span>
                                                 </label>
@@ -2571,6 +2572,8 @@
         let currentUser = null;
         let currentActiveSubject = 'Tổng hợp';
         let currentActiveQuestionSet = 'Bộ 1';
+        let currentActiveCourse = null;
+        let currentActiveQuestionSetId = null;
         let currentRole = null;
         let questions = [];
         let currentQuestionIndex = 0;
@@ -2649,87 +2652,74 @@
         function userLogin(event) {
             if (event) event.preventDefault();
             const userName = document.getElementById('user-name').value.trim();
+            
             console.log('=== USER LOGIN DEBUG ===');
-            console.log('User login attempt with name:', userName);
+            console.log('👤 User login attempt with name:', userName);
             
             if (userName) {
                 console.log('✅ User login successful!');
                 currentUser = userName;
                 currentRole = 'user';
                 
-                // Step 1: Hide all screens first
-                console.log('Step 1: Hiding all screens...');
+                // Hide all screens
+                console.log('🔄 Hiding all screens...');
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('admin-login').classList.add('hidden');
                 document.getElementById('user-login').classList.add('hidden');
                 document.getElementById('admin-dashboard').classList.add('hidden');
                 
-                // Step 2: Check if user-dashboard exists
+                // Show user dashboard
                 const userDashboard = document.getElementById('user-dashboard');
-                console.log('Step 2: User dashboard element:', userDashboard);
+                console.log('📊 User dashboard element:', userDashboard);
                 
                 if (!userDashboard) {
                     console.error('❌ ERROR: user-dashboard element not found!');
-                    alert('CRITICAL ERROR: user-dashboard not found!\n\nPlease reload the page.');
-                    // Fallback: show login screen again
+                    alert('❌ CRITICAL ERROR: user-dashboard not found!');
                     document.getElementById('login-screen').classList.remove('hidden');
                     return;
                 }
                 
-                // Step 3: Force show user dashboard with multiple methods
-                console.log('Step 3: Showing user dashboard...');
+                // Show dashboard
+                console.log('✨ Showing user dashboard...');
                 userDashboard.classList.remove('hidden');
                 userDashboard.style.display = 'block';
                 userDashboard.style.visibility = 'visible';
                 userDashboard.style.opacity = '1';
                 
-                // Step 4: Verify visibility
-                setTimeout(() => {
-                    const isVisible = !userDashboard.classList.contains('hidden');
-                    const computedStyle = window.getComputedStyle(userDashboard);
-                    console.log('Step 4: Dashboard visibility check:');
-                    console.log('- Has hidden class:', userDashboard.classList.contains('hidden'));
-                    console.log('- Display style:', computedStyle.display);
-                    console.log('- Visibility style:', computedStyle.visibility);
-                    console.log('- Opacity style:', computedStyle.opacity);
-                    
-                    if (!isVisible || computedStyle.display === 'none') {
-                        console.error('❌ Dashboard still not visible after all attempts!');
-                        alert('DASHBOARD VISIBILITY ERROR!\n\nThe user dashboard element exists but is not showing.\nCheck browser console for details.');
-                    } else {
-                        console.log('✅ Dashboard should be visible now!');
-                    }
-                }, 100);
+                // Update user name elements
+                const welcomeElement = document.getElementById('welcome-user-name');
+                const currentElement = document.getElementById('current-user-name');
                 
-                // Step 5: Update user name elements
-                console.log('Step 5: Updating user name elements...');
-                const currentUserNameElement = document.getElementById('current-user-name');
-                if (currentUserNameElement) {
-                    currentUserNameElement.textContent = currentUser;
-                    console.log('✅ Updated current-user-name:', currentUser);
-                } else {
-                    console.warn('⚠️ current-user-name element not found');
-                }
-                
-                const welcomeUserNameElement = document.getElementById('welcome-user-name');
-                if (welcomeUserNameElement) {
-                    welcomeUserNameElement.textContent = currentUser;
+                if (welcomeElement) {
+                    welcomeElement.textContent = currentUser;
                     console.log('✅ Updated welcome-user-name:', currentUser);
                 } else {
                     console.warn('⚠️ welcome-user-name element not found');
                 }
                 
-                // Step 6: Load user data
-                console.log('Step 6: Loading user data...');
-                setTimeout(() => {
-                    loadUserData();
-                    console.log('✅ User data loading initiated');
-                }, 200);
+                if (currentElement) {
+                    currentElement.textContent = currentUser;
+                    console.log('✅ Updated current-user-name:', currentUser);
+                } else {
+                    console.warn('⚠️ current-user-name element not found');
+                }
                 
-                console.log('=== USER LOGIN COMPLETE ===');
+                // Load basic user stats (simplified)
+                console.log('📊 Loading basic user stats...');
+                setTimeout(() => {
+                    try {
+                        loadUserStats();
+                        console.log('✅ User stats loaded');
+                    } catch (error) {
+                        console.warn('⚠️ Error loading user stats:', error);
+                    }
+                }, 100);
+                
+                console.log('✅ User login complete!');
+                console.log('=== LOGIN SUCCESS ===');
                 
             } else {
-                alert('Vui lòng nhập tên!');
+                alert('⚠️ Vui lòng nhập tên!');
             }
         }
         
@@ -3540,7 +3530,7 @@
         };
 
         // User Functions
-        function loadUserData() {
+        function loadUserDashboardData() {
             loadAdminApiKeys(); // Load API keys for user too
             loadQuizSets();
         }
@@ -5205,13 +5195,6 @@ D. ${question.answers.D}
             }, 3000);
         }
 
-        function loadUserStats() {
-            document.getElementById('total-attempts').textContent = '25';
-            document.getElementById('average-score').textContent = '85%';
-            document.getElementById('total-time').textContent = '12h 30m';
-            document.getElementById('best-score').textContent = '95%';
-        }
-
         function loadQuizSets() {
             const quizSetsContainer = document.getElementById('quiz-sets-list');
             if (!quizSetsContainer) return;
@@ -6120,8 +6103,8 @@ QUAN TRỌNG:
             alert('Tính năng xử lý tài liệu AI đang được phát triển! Hiện tại chỉ hỗ trợ tạo câu hỏi từ hình ảnh.');
         }
 
-        // Quick Add Question Function
-        function quickAddQuestion(event) {
+        // Quick Add Question Function - Updated for Firebase & 3-tier system
+        async function quickAddQuestion(event) {
             event.preventDefault();
             
             console.log('🚀 Quick Add Question triggered');
@@ -6142,55 +6125,480 @@ QUAN TRỌNG:
                 return;
             }
             
-            // Load existing questions
-            let questions = JSON.parse(localStorage.getItem('quiz-questions') || '[]');
+            try {
+                // Create question object for 3-tier system
+                const questionData = {
+                    content: questionContent,
+                    answers: {
+                        A: answerA,
+                        B: answerB,
+                        C: answerC,
+                        D: answerD
+                    },
+                    correctAnswer: correctAnswer,
+                    subject: subject,
+                    difficulty: difficulty,
+                    explanation: `Đáp án đúng là ${correctAnswer}`,
+                    createdBy: currentUser || 'Admin',
+                    isAIGenerated: false,
+                    questionSetId: currentActiveQuestionSet || 'default_set',
+                    courseId: currentActiveCourse || 'default_course'
+                };
+                
+                // Save to Firebase (with localStorage fallback)
+                await addQuestionToSet(questionData);
+                
+                console.log('✅ Quick question added:', questionData);
+                
+                // Reset form (keep subject and difficulty)
+                document.getElementById('quick-question').value = '';
+                document.getElementById('quick-answer-a').value = '';
+                document.getElementById('quick-answer-b').value = '';
+                document.getElementById('quick-answer-c').value = '';
+                document.getElementById('quick-answer-d').value = '';
+                document.getElementById('quick-correct-answer').value = '';
+                
+                // Refresh display
+                displayAdminQuestions();
+                loadAdminStats();
+                
+                // Show success message
+                alert('✅ Đã thêm câu hỏi thành công!');
+                
+                // Focus back to question input for quick adding more
+                document.getElementById('quick-question').focus();
+                
+            } catch (error) {
+                console.error('❌ Error adding question:', error);
+                alert('❌ Lỗi khi thêm câu hỏi: ' + error.message);
+            }
+        }
+
+        // ===================== FIREBASE INTEGRATION & 3-TIER SYSTEM =====================
+        
+        // Firebase Database Functions
+        async function saveToFirebase(collectionName, data) {
+            try {
+                if (!window.db || !window.firestore) {
+                    console.warn('Firebase not available, saving to localStorage');
+                    return saveToLocalStorage(collectionName, data);
+                }
+                
+                const docRef = await window.firestore.addDoc(
+                    window.firestore.collection(window.db, collectionName), 
+                    data
+                );
+                console.log('✅ Document saved to Firebase:', docRef.id);
+                return docRef.id;
+            } catch (error) {
+                console.error('❌ Firebase save error:', error);
+                // Fallback to localStorage
+                return saveToLocalStorage(collectionName, data);
+            }
+        }
+
+        async function loadFromFirebase(collectionName) {
+            try {
+                if (!window.db || !window.firestore) {
+                    console.warn('Firebase not available, loading from localStorage');
+                    return loadFromLocalStorage(collectionName);
+                }
+                
+                const querySnapshot = await window.firestore.getDocs(
+                    window.firestore.collection(window.db, collectionName)
+                );
+                
+                const data = [];
+                querySnapshot.forEach((doc) => {
+                    data.push({ id: doc.id, ...doc.data() });
+                });
+                
+                console.log(`✅ Loaded ${data.length} items from Firebase collection: ${collectionName}`);
+                return data;
+            } catch (error) {
+                console.error('❌ Firebase load error:', error);
+                return loadFromLocalStorage(collectionName);
+            }
+        }
+
+        function saveToLocalStorage(key, data) {
+            try {
+                const existingData = JSON.parse(localStorage.getItem(key) || '[]');
+                const newItem = { ...data, id: data.id || Date.now().toString() };
+                existingData.push(newItem);
+                localStorage.setItem(key, JSON.stringify(existingData));
+                console.log(`✅ Saved to localStorage: ${key}`);
+                return newItem.id;
+            } catch (error) {
+                console.error('❌ LocalStorage save error:', error);
+                return null;
+            }
+        }
+
+        function loadFromLocalStorage(key) {
+            try {
+                const data = JSON.parse(localStorage.getItem(key) || '[]');
+                console.log(`📥 Loaded from localStorage: ${key}, items: ${data.length}`);
+                return data;
+            } catch (error) {
+                console.error('❌ LocalStorage load error:', error);
+                return [];
+            }
+        }
+
+        // 3-Tier System: Courses (Học phần) → Question Sets (Bộ đề) → Questions (Câu hỏi)
+        
+        // COURSES MANAGEMENT (HỌC PHẦN)
+        async function addCourse(courseData) {
+            console.log('📚 Adding new course:', courseData);
             
-            // Create question object
-            const questionData = {
-                id: Date.now().toString(),
-                subject: subject,
-                set: currentActiveQuestionSet || 'Bộ 1',
-                content: questionContent,
-                answers: {
-                    A: answerA,
-                    B: answerB,
-                    C: answerC,
-                    D: answerD
-                },
-                correctAnswer: correctAnswer,
-                explanation: `Đáp án đúng là ${correctAnswer}`,
-                difficulty: difficulty,
-                createdAt: new Date(),
-                createdBy: currentUser || 'Admin',
-                isAIGenerated: false
+            const course = {
+                ...courseData,
+                id: courseData.id || `course_${Date.now()}`,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                questionSetsCount: 0,
+                questionsCount: 0
             };
             
-            // Add to questions array
-            questions.push(questionData);
-            
-            // Save to localStorage
-            localStorage.setItem('quiz-questions', JSON.stringify(questions));
-            
-            console.log('✅ Quick question added:', questionData);
-            
-            // Reset form (keep subject and difficulty)
-            document.getElementById('quick-question').value = '';
-            document.getElementById('quick-answer-a').value = '';
-            document.getElementById('quick-answer-b').value = '';
-            document.getElementById('quick-answer-c').value = '';
-            document.getElementById('quick-answer-d').value = '';
-            document.getElementById('quick-correct-answer').value = '';
-            
-            // Refresh display
-            displayAdminQuestions();
-            loadAdminStats();
-            
-            // Show success message
-            alert('✅ Đã thêm câu hỏi thành công!');
-            
-            // Focus back to question input for quick adding more
-            document.getElementById('quick-question').focus();
+            try {
+                await saveToFirebase('courses', course);
+                await loadCourses(); // Reload UI
+                return course.id;
+            } catch (error) {
+                console.error('❌ Error adding course:', error);
+                throw error;
+            }
         }
+
+        async function loadCourses() {
+            try {
+                console.log('📚 Loading courses...');
+                const courses = await loadFromFirebase('courses');
+                window.coursesData = courses;
+                displayCourses(courses);
+                return courses;
+            } catch (error) {
+                console.error('❌ Error loading courses:', error);
+                return [];
+            }
+        }
+
+        function displayCourses(courses) {
+            const coursesList = document.getElementById('courses-list');
+            if (!coursesList) return;
+            
+            if (courses.length === 0) {
+                coursesList.innerHTML = '<p class="text-center text-gray-500 py-8">Chưa có học phần nào</p>';
+                return;
+            }
+            
+            coursesList.innerHTML = courses.map(course => `
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-gray-800">${course.name || 'Tên học phần'}</h4>
+                            <p class="text-sm text-gray-600 mt-1">Mã: ${course.code || 'N/A'}</p>
+                            <p class="text-sm text-gray-500 mt-1">
+                                ${course.questionSetsCount || 0} bộ đề • ${course.questionsCount || 0} câu hỏi
+                            </p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="viewCourseQuestionSets('${course.id}')" 
+                                    class="text-blue-600 hover:text-blue-800 px-2 py-1 rounded">
+                                <i class="fas fa-folder-open mr-1"></i>Xem bộ đề
+                            </button>
+                            <button onclick="editCourse('${course.id}')" 
+                                    class="text-yellow-600 hover:text-yellow-800 px-2 py-1 rounded">
+                                <i class="fas fa-edit mr-1"></i>Sửa
+                            </button>
+                            <button onclick="deleteCourse('${course.id}')" 
+                                    class="text-red-600 hover:text-red-800 px-2 py-1 rounded">
+                                <i class="fas fa-trash mr-1"></i>Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // QUESTION SETS MANAGEMENT (BỘ ĐỀ)
+        async function addQuestionSet(questionSetData) {
+            console.log('📝 Adding new question set:', questionSetData);
+            
+            const questionSet = {
+                ...questionSetData,
+                id: questionSetData.id || `qset_${Date.now()}`,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                questionsCount: 0
+            };
+            
+            try {
+                await saveToFirebase('questionSets', questionSet);
+                await loadQuestionSets(questionSetData.courseId); // Reload UI
+                return questionSet.id;
+            } catch (error) {
+                console.error('❌ Error adding question set:', error);
+                throw error;
+            }
+        }
+
+        async function loadQuestionSets(courseId = null) {
+            try {
+                console.log('📝 Loading question sets for course:', courseId);
+                const allQuestionSets = await loadFromFirebase('questionSets');
+                
+                const questionSets = courseId 
+                    ? allQuestionSets.filter(qs => qs.courseId === courseId)
+                    : allQuestionSets;
+                
+                window.questionSetsData = questionSets;
+                displayQuestionSets(questionSets, courseId);
+                return questionSets;
+            } catch (error) {
+                console.error('❌ Error loading question sets:', error);
+                return [];
+            }
+        }
+
+        function displayQuestionSets(questionSets, courseId) {
+            const questionSetsList = document.getElementById('question-sets-list');
+            if (!questionSetsList) return;
+            
+            if (questionSets.length === 0) {
+                questionSetsList.innerHTML = '<p class="text-center text-gray-500 py-8">Chưa có bộ đề nào</p>';
+                return;
+            }
+            
+            questionSetsList.innerHTML = questionSets.map(qs => `
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-gray-800">${qs.name || 'Tên bộ đề'}</h4>
+                            <p class="text-sm text-gray-600 mt-1">${qs.description || 'Không có mô tả'}</p>
+                            <p class="text-sm text-gray-500 mt-1">
+                                ${qs.questionsCount || 0} câu hỏi
+                            </p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="viewQuestions('${qs.id}')" 
+                                    class="text-blue-600 hover:text-blue-800 px-2 py-1 rounded">
+                                <i class="fas fa-eye mr-1"></i>Xem câu hỏi
+                            </button>
+                            <button onclick="editQuestionSet('${qs.id}')" 
+                                    class="text-yellow-600 hover:text-yellow-800 px-2 py-1 rounded">
+                                <i class="fas fa-edit mr-1"></i>Sửa
+                            </button>
+                            <button onclick="deleteQuestionSet('${qs.id}')" 
+                                    class="text-red-600 hover:text-red-800 px-2 py-1 rounded">
+                                <i class="fas fa-trash mr-1"></i>Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // QUESTIONS MANAGEMENT (CÂU HỎI) - Updated to work with 3-tier system
+        async function addQuestionToSet(questionData) {
+            console.log('❓ Adding new question:', questionData);
+            
+            const question = {
+                ...questionData,
+                id: questionData.id || `q_${Date.now()}`,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            
+            try {
+                await saveToFirebase('questions', question);
+                await loadQuestions(questionData.questionSetId); // Reload UI
+                return question.id;
+            } catch (error) {
+                console.error('❌ Error adding question:', error);
+                throw error;
+            }
+        }
+
+        async function loadQuestions(questionSetId = null) {
+            try {
+                console.log('❓ Loading questions for question set:', questionSetId);
+                const allQuestions = await loadFromFirebase('questions');
+                
+                const questions = questionSetId 
+                    ? allQuestions.filter(q => q.questionSetId === questionSetId)
+                    : allQuestions;
+                
+                window.questionsData = questions;
+                displayQuestions(questions);
+                return questions;
+            } catch (error) {
+                console.error('❌ Error loading questions:', error);
+                return [];
+            }
+        }
+
+        function displayQuestions(questions) {
+            const questionsList = document.getElementById('questions-list');
+            if (!questionsList) return;
+            
+            if (questions.length === 0) {
+                questionsList.innerHTML = '<p class="text-center text-gray-500 py-8">Chưa có câu hỏi nào</p>';
+                return;
+            }
+            
+            questionsList.innerHTML = questions.map(question => `
+                <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-gray-800">${question.content || 'Không có nội dung'}</h4>
+                            <div class="grid grid-cols-2 gap-2 mt-2 text-sm">
+                                <span class="text-gray-600">A. ${question.answers?.A || 'N/A'}</span>
+                                <span class="text-gray-600">B. ${question.answers?.B || 'N/A'}</span>
+                                <span class="text-gray-600">C. ${question.answers?.C || 'N/A'}</span>
+                                <span class="text-gray-600">D. ${question.answers?.D || 'N/A'}</span>
+                            </div>
+                            <p class="text-sm text-green-600 mt-2">
+                                ✓ Đáp án đúng: ${question.correctAnswer || 'N/A'}
+                            </p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="editQuestion('${question.id}')" 
+                                    class="text-yellow-600 hover:text-yellow-800 px-2 py-1 rounded">
+                                <i class="fas fa-edit mr-1"></i>Sửa
+                            </button>
+                            <button onclick="deleteQuestion('${question.id}')" 
+                                    class="text-red-600 hover:text-red-800 px-2 py-1 rounded">
+                                <i class="fas fa-trash mr-1"></i>Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Global window functions for UI interaction
+        window.addCourse = addCourse;
+        window.loadCourses = loadCourses;
+        window.addQuestionSet = addQuestionSet;
+        window.loadQuestionSets = loadQuestionSets;
+        window.addQuestionToSet = addQuestionToSet;
+        window.loadQuestions = loadQuestions;
+
+        // System Settings Functions
+        function saveSystemSettings() {
+            console.log('💾 Saving system settings...');
+            
+            try {
+                // Get all settings values
+                const settings = {
+                    quizTime: document.getElementById('quiz-time')?.value || 30,
+                    questionsPerSet: document.getElementById('questions-per-set')?.value || 50,
+                    adminPassword: document.getElementById('admin-password')?.value || 'admin123',
+                    enableAI: document.getElementById('enable-ai')?.checked || false,
+                    allowUserRegistration: document.getElementById('allow-user-registration')?.checked || false,
+                    enableGamification: document.getElementById('enable-gamification')?.checked || false,
+                    enableAdaptiveLearning: document.getElementById('enable-adaptive-learning')?.checked || false,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                console.log('Settings to save:', settings);
+                
+                // Save to localStorage
+                localStorage.setItem('quiz-system-settings', JSON.stringify(settings));
+                
+                // Save to Firebase if available
+                if (typeof db !== 'undefined' && db) {
+                    // Firebase save (implement later)
+                    console.log('Firebase save will be implemented');
+                }
+                
+                // Show success message
+                alert('✅ Đã lưu cài đặt thành công!');
+                
+                // Apply settings immediately
+                applySystemSettings(settings);
+                
+            } catch (error) {
+                console.error('❌ Error saving settings:', error);
+                alert('❌ Lỗi khi lưu cài đặt: ' + error.message);
+            }
+        }
+
+        function resetSystemSettings() {
+            console.log('🔄 Resetting system settings...');
+            
+            try {
+                // Reset to default values
+                const defaultSettings = {
+                    quizTime: 30,
+                    questionsPerSet: 50,
+                    adminPassword: 'admin123',
+                    enableAI: true,
+                    allowUserRegistration: true,
+                    enableGamification: true,  
+                    enableAdaptiveLearning: true
+                };
+                
+                // Update UI elements
+                if (document.getElementById('quiz-time')) document.getElementById('quiz-time').value = defaultSettings.quizTime;
+                if (document.getElementById('questions-per-set')) document.getElementById('questions-per-set').value = defaultSettings.questionsPerSet;
+                if (document.getElementById('admin-password')) document.getElementById('admin-password').value = defaultSettings.adminPassword;
+                if (document.getElementById('enable-ai')) document.getElementById('enable-ai').checked = defaultSettings.enableAI;
+                if (document.getElementById('allow-user-registration')) document.getElementById('allow-user-registration').checked = defaultSettings.allowUserRegistration;
+                if (document.getElementById('enable-gamification')) document.getElementById('enable-gamification').checked = defaultSettings.enableGamification;
+                if (document.getElementById('enable-adaptive-learning')) document.getElementById('enable-adaptive-learning').checked = defaultSettings.enableAdaptiveLearning;
+                
+                // Save to localStorage
+                localStorage.setItem('quiz-system-settings', JSON.stringify(defaultSettings));
+                
+                alert('✅ Đã reset về cài đặt mặc định!');
+                
+            } catch (error) {
+                console.error('❌ Error resetting settings:', error);
+                alert('❌ Lỗi khi reset cài đặt: ' + error.message);
+            }
+        }
+
+        function loadSystemSettings() {
+            console.log('📥 Loading system settings...');
+            
+            try {
+                const savedSettings = localStorage.getItem('quiz-system-settings');
+                if (savedSettings) {
+                    const settings = JSON.parse(savedSettings);
+                    
+                    // Apply settings to UI
+                    if (document.getElementById('quiz-time')) document.getElementById('quiz-time').value = settings.quizTime || 30;
+                    if (document.getElementById('questions-per-set')) document.getElementById('questions-per-set').value = settings.questionsPerSet || 50;
+                    if (document.getElementById('admin-password')) document.getElementById('admin-password').value = settings.adminPassword || 'admin123';
+                    if (document.getElementById('enable-ai')) document.getElementById('enable-ai').checked = settings.enableAI !== false;
+                    if (document.getElementById('allow-user-registration')) document.getElementById('allow-user-registration').checked = settings.allowUserRegistration !== false;
+                    if (document.getElementById('enable-gamification')) document.getElementById('enable-gamification').checked = settings.enableGamification !== false;
+                    if (document.getElementById('enable-adaptive-learning')) document.getElementById('enable-adaptive-learning').checked = settings.enableAdaptiveLearning !== false;
+                    
+                    console.log('✅ Settings loaded successfully');
+                    applySystemSettings(settings);
+                }
+            } catch (error) {
+                console.error('❌ Error loading settings:', error);
+            }
+        }
+
+        function applySystemSettings(settings) {
+            // Apply settings to global variables
+            if (settings.quizTime) window.defaultQuizTime = parseInt(settings.quizTime) * 60; // Convert to seconds
+            if (settings.questionsPerSet) window.defaultQuestionsPerSet = parseInt(settings.questionsPerSet);
+            if (settings.adminPassword) window.adminPassword = settings.adminPassword;
+            
+            console.log('⚙️ Settings applied:', settings);
+        }
+
+        // Load settings when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(loadSystemSettings, 100); // Small delay to ensure DOM is ready
+        });
         
         // Expose AI functions globally
         window.handleAIImageUpload = handleAIImageUpload;
