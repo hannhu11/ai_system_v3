@@ -2909,13 +2909,132 @@
         }
         
         // Admin functions  
-        function loadAdminData() {
-            console.log('Loading admin data...');
+        async function loadAdminData() {
+            console.log('🔥 Starting admin data loading...');
+            
+            // Test Firebase connection first
+            await testFirebaseConnection();
+            
+            // Load Firebase data
+            console.log('📊 Loading data from Firebase...');
+            await loadCoursesFromFirebase();
+            await loadQuestionSetsFromFirebase();
+            await loadQuestionsFromFirebase();
+            
+            // Load legacy functions
             loadSubjects(); // Load subjects first
             loadAdminQuestions();
             loadAdminApiKeys();
             loadAdminStats();
             loadUserStatistics();
+            
+            console.log('✅ Admin data loading complete!');
+        }
+
+        async function testFirebaseConnection() {
+            try {
+                console.log('🧪 Testing Firebase connection...');
+                
+                if (!window.db || !window.firestore) {
+                    throw new Error('Firebase not initialized');
+                }
+                
+                // Try to read from a test collection
+                const testData = await window.firestore.getDocs(
+                    window.firestore.collection(window.db, 'courses')
+                );
+                
+                console.log('✅ Firebase connection successful!');
+                console.log(`📚 Found ${testData.size} courses in Firebase`);
+                
+                // Show Firebase status in UI
+                showFirebaseStatus(true, testData.size);
+                
+            } catch (error) {
+                console.error('❌ Firebase connection failed:', error);
+                showFirebaseStatus(false, 0);
+            }
+        }
+
+        function showFirebaseStatus(connected, itemCount) {
+            // Create or update Firebase status indicator
+            let statusDiv = document.getElementById('firebase-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'firebase-status';
+                statusDiv.className = 'fixed top-4 right-4 z-50 p-3 rounded-lg text-sm font-medium';
+                document.body.appendChild(statusDiv);
+            }
+            
+            if (connected) {
+                statusDiv.className = 'fixed top-4 right-4 z-50 p-3 rounded-lg text-sm font-medium bg-green-100 text-green-800 border border-green-200';
+                statusDiv.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span>🔥 Firebase Connected</span>
+                        <span class="text-green-600">(${itemCount} items)</span>
+                    </div>
+                `;
+            } else {
+                statusDiv.className = 'fixed top-4 right-4 z-50 p-3 rounded-lg text-sm font-medium bg-red-100 text-red-800 border border-red-200';
+                statusDiv.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-red-500 rounded-full"></div>
+                        <span>❌ Firebase Disconnected</span>
+                    </div>
+                `;
+            }
+            
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                if (statusDiv) statusDiv.remove();
+            }, 5000);
+        }
+
+        async function loadCoursesFromFirebase() {
+            try {
+                console.log('📚 Loading courses from Firebase...');
+                const courses = await loadFromFirebase('courses');
+                window.coursesData = courses;
+                console.log(`✅ Loaded ${courses.length} courses from Firebase`);
+                
+                // Update UI if courses list exists
+                if (courses.length > 0) {
+                    displayCourses(courses);
+                    console.log('📊 Courses displayed in UI');
+                }
+                
+                return courses;
+            } catch (error) {
+                console.error('❌ Error loading courses:', error);
+                return [];
+            }
+        }
+
+        async function loadQuestionSetsFromFirebase() {
+            try {
+                console.log('📝 Loading question sets from Firebase...');
+                const questionSets = await loadFromFirebase('questionSets');
+                window.questionSetsData = questionSets;
+                console.log(`✅ Loaded ${questionSets.length} question sets from Firebase`);
+                return questionSets;
+            } catch (error) {
+                console.error('❌ Error loading question sets:', error);
+                return [];
+            }
+        }
+
+        async function loadQuestionsFromFirebase() {
+            try {
+                console.log('❓ Loading questions from Firebase...');
+                const questions = await loadFromFirebase('questions');
+                window.questionsData = questions;
+                console.log(`✅ Loaded ${questions.length} questions from Firebase`);
+                return questions;
+            } catch (error) {
+                console.error('❌ Error loading questions:', error);
+                return [];
+            }
         }
         
         function loadUserData() {
