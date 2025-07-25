@@ -17,7 +17,7 @@
     <!-- Firebase -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
-        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
         import { getStorage } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
         
         const firebaseConfig = {
@@ -34,10 +34,19 @@
         window.db = getFirestore(window.firebaseApp);
         window.storage = getStorage(window.firebaseApp);
         
-        // Expose Firestore functions globally
+        // Expose Firestore functions globally (EXTENDED)
         window.firestore = {
-            collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy
+            collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, setDoc
         };
+        
+        // Also expose directly for easier access
+        window.getDocs = getDocs;
+        window.collection = collection;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.addDoc = addDoc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
         
         console.log('🔥 Firebase initialized successfully');
     </script>
@@ -2591,6 +2600,16 @@
             console.log('App initialized');
             setupImagePreview();
             
+            // Wait for Firebase to be initialized
+            const waitForFirebase = setInterval(() => {
+                if (window.db && window.firestore) {
+                    console.log('✅ Firebase ready!');
+                    clearInterval(waitForFirebase);
+                } else {
+                    console.log('⏳ Waiting for Firebase...');
+                }
+            }, 100);
+            
             // Test if functions are available
             console.log('showAdminLogin available:', typeof window.showAdminLogin === 'function');
             console.log('showUserLogin available:', typeof window.showUserLogin === 'function');
@@ -2656,12 +2675,55 @@
             if (userName) {
                 currentUser = userName;
                 currentRole = 'user';
-                document.getElementById('current-user-name').textContent = currentUser;
                 
+                // Update ALL user name display elements
+                const userNameElements = ['current-user-name', 'welcome-user-name'];
+                userNameElements.forEach(elementId => {
+                    const element = document.getElementById(elementId);
+                    if (element) {
+                        element.textContent = currentUser;
+                        console.log(`✅ Updated ${elementId}: ${currentUser}`);
+                    } else {
+                        console.warn(`⚠️ Element ${elementId} not found`);
+                    }
+                });
+                
+                // Hide login and show dashboard
                 document.getElementById('user-login').classList.add('hidden');
-                document.getElementById('user-dashboard').classList.remove('hidden');
                 
-                loadUserData();
+                const userDashboard = document.getElementById('user-dashboard');
+                if (userDashboard) {
+                    userDashboard.classList.remove('hidden');
+                    console.log('✅ User dashboard shown');
+                } else {
+                    console.error('❌ user-dashboard element not found!');
+                    alert('❌ Dashboard không tìm thấy! Vui lòng reload trang.');
+                    return;
+                }
+                
+                // Wait for Firebase before loading data
+                if (window.db && window.firestore) {
+                    console.log('🔥 Firebase ready, loading user data...');
+                    loadUserData();
+                } else {
+                    console.log('⏳ Firebase not ready, waiting...');
+                    const waitForFirebase = setInterval(() => {
+                        if (window.db && window.firestore) {
+                            console.log('🔥 Firebase now ready, loading user data...');
+                            clearInterval(waitForFirebase);
+                            loadUserData();
+                        }
+                    }, 500);
+                    
+                    // Timeout after 10 seconds
+                    setTimeout(() => {
+                        clearInterval(waitForFirebase);
+                        console.log('⚠️ Firebase timeout, loading user data anyway...');
+                        loadUserData();
+                    }, 10000);
+                }
+                
+                console.log('✅ User login completed successfully!');
             } else {
                 alert('Vui lòng nhập tên!');
             }
@@ -2852,6 +2914,43 @@
             console.log('API keys saved:', apiKeys);
         }
         
+        // ===================== FIREBASE CORE FUNCTIONS (MOVED UP) =====================
+        
+        async function loadFromFirebase(collectionName) {
+            try {
+                if (!window.db || !window.firestore) {
+                    console.warn('Firebase not available, loading from localStorage');
+                    return loadFromLocalStorage(collectionName);
+                }
+                
+                const querySnapshot = await window.firestore.getDocs(
+                    window.firestore.collection(window.db, collectionName)
+                );
+                
+                const data = [];
+                querySnapshot.forEach((doc) => {
+                    data.push({ id: doc.id, ...doc.data() });
+                });
+                
+                console.log(`✅ Loaded ${data.length} items from Firebase collection: ${collectionName}`);
+                return data;
+            } catch (error) {
+                console.error('❌ Firebase load error:', error);
+                return loadFromLocalStorage(collectionName);
+            }
+        }
+        
+        function loadFromLocalStorage(key) {
+            try {
+                const data = JSON.parse(localStorage.getItem(key) || '[]');
+                console.log(`📱 Loaded ${data.length} items from localStorage: ${key}`);
+                return data;
+            } catch (error) {
+                console.error('❌ LocalStorage load error:', error);
+                return [];
+            }
+        }
+
         // Admin functions  
         async function loadAdminData() {
             console.log('🔥 Starting admin data loading...');
@@ -3043,28 +3142,40 @@
         }
         
         function loadUserData() {
-            console.log('Loading user data...');
-            
-            // Load API keys first
-            loadAdminApiKeys();
-            
-            // Load user stats
-            loadUserStats();
-            
-            // Make sure main-dashboard is visible
-            const mainDashboard = document.getElementById('main-dashboard');
-            if (mainDashboard) {
-                mainDashboard.classList.remove('hidden');
-                console.log('Main dashboard is now visible');
-            } else {
-                console.error('main-dashboard element not found!');
+            try {
+                console.log('📊 Loading user data...');
+                
+                // Load API keys first
+                loadAdminApiKeys();
+                
+                // Load user stats
+                loadUserStats();
+                
+                // Make sure main-dashboard is visible
+                const mainDashboard = document.getElementById('main-dashboard');
+                if (mainDashboard) {
+                    mainDashboard.classList.remove('hidden');
+                    console.log('✅ Main dashboard is now visible');
+                } else {
+                    console.error('❌ main-dashboard element not found!');
+                }
+                
+                // Load quiz sets/subjects for user (with error handling)
+                try {
+                    loadQuizSets();
+                    console.log('✅ Quiz sets loading initiated');
+                } catch (error) {
+                    console.error('❌ Error loading quiz sets:', error);
+                }
+                
+                // Update daily motivation
+                updateDailyMotivation();
+                
+                console.log('✅ User data loading completed');
+            } catch (error) {
+                console.error('❌ Error in loadUserData:', error);
+                alert('⚠️ Có lỗi khi tải dữ liệu user. Vui lòng thử lại!');
             }
-            
-            // Load quiz sets/subjects for user
-            loadQuizSets();
-            
-            // Update daily motivation
-            updateDailyMotivation();
         }
         
         function updateDailyMotivation() {
@@ -4537,44 +4648,6 @@ D. ${question.answers.D}
             document.getElementById('edit-question-modal').classList.add('hidden');
             editingQuestionId = null;
         };
-
-        // Trong hàm displayAdminQuestions, thêm nút phóng to và sửa:
-        questionsList.innerHTML = questionsToShow.map((question, index) => {
-            // Find subject and question set names
-            const subject = subjects.find(s => s.id === question.subjectId);
-            const questionSet = questionSets.find(qs => qs.id === question.questionSetId);
-            
-            return `
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <div class="flex items-center space-x-4 mb-3">
-                                <div class="relative">
-                                    <img src="${question.image}" alt="Question ${index + 1}" class="w-20 h-20 object-cover rounded-lg cursor-pointer" onclick="openAdminImageModal('${question.image}')">
-                                    <button onclick="openAdminImageModal('${question.image}')" class="absolute bottom-1 right-1 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">🔍</button>
-                                </div>
-                                <div>
-                                    <h4 class="font-semibold text-gray-800">Câu ${index + 1}</h4>
-                                    <p class="text-sm text-blue-600 font-medium">📚 ${subject?.name || 'Chưa rõ môn'} - 📋 ${questionSet?.name || 'Chưa rõ bộ đề'}</p>
-                                    <p class="text-sm text-gray-600">${question.content || 'Câu hỏi từ hình ảnh'}</p>
-                                    <p class="text-sm text-green-600 font-medium">Đáp án: ${question.correctAnswer}</p>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2 text-sm">
-                                <div>A. ${question.answers.A}</div>
-                                <div>B. ${question.answers.B}</div>
-                                <div>C. ${question.answers.C}</div>
-                                <div>D. ${question.answers.D}</div>
-                            </div>
-                        </div>
-                        <div class="flex flex-col space-y-2 ml-4">
-                            <button onclick="editAdminQuestion('${question.id}')" class="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors">✏️ Sửa</button>
-                            <button onclick="deleteAdminQuestion('${question.id}')" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">🗑️ Xóa</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
 
         // Thêm modal phóng to ảnh cho admin (dùng lại modal cũ nhưng id khác)
         let adminCurrentZoom = 1, adminImgPosX = 0, adminImgPosY = 0, adminIsDragging = false, adminDragStartX = 0, adminDragStartY = 0;
