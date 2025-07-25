@@ -21,13 +21,13 @@
         import { getStorage } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
         
         const firebaseConfig = {
-        apiKey: "AIzaSyCGAvJ8du5Xcp56ac4zPGLr2jcWPFr_qck",
-        authDomain: "quiz-ai-system.firebaseapp.com",
-        projectId: "quiz-ai-system",
-        storageBucket: "quiz-ai-system.firebasestorage.app",
-        messagingSenderId: "823165200254",
-        appId: "1:823165200254:web:3e67eb0ccd1f46da5ab52f",
-        measurementId: "G-16MBCN7DX6"
+            apiKey: "AIzaSyCGAvJ8du5Xcp56ac4zPGLr2jcWPFr_qck",
+            authDomain: "quiz-ai-system.firebaseapp.com",
+            projectId: "quiz-ai-system",
+            storageBucket: "quiz-ai-system.firebasestorage.app",
+            messagingSenderId: "823165200254",
+            appId: "1:823165200254:web:3e67eb0ccd1f46da5ab52f",
+            measurementId: "G-16MBCN7DX6"
         };
         
         window.firebaseApp = initializeApp(firebaseConfig);
@@ -2650,76 +2650,20 @@
         }
         
         function userLogin(event) {
-            if (event) event.preventDefault();
+            event.preventDefault();
             const userName = document.getElementById('user-name').value.trim();
             
-            console.log('=== USER LOGIN DEBUG ===');
-            console.log('👤 User login attempt with name:', userName);
-            
             if (userName) {
-                console.log('✅ User login successful!');
                 currentUser = userName;
                 currentRole = 'user';
+                document.getElementById('current-user-name').textContent = currentUser;
                 
-                // Hide all screens
-                console.log('🔄 Hiding all screens...');
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('admin-login').classList.add('hidden');
                 document.getElementById('user-login').classList.add('hidden');
-                document.getElementById('admin-dashboard').classList.add('hidden');
+                document.getElementById('user-dashboard').classList.remove('hidden');
                 
-                // Show user dashboard
-                const userDashboard = document.getElementById('user-dashboard');
-                console.log('📊 User dashboard element:', userDashboard);
-                
-                if (!userDashboard) {
-                    console.error('❌ ERROR: user-dashboard element not found!');
-                    alert('❌ CRITICAL ERROR: user-dashboard not found!');
-                    document.getElementById('login-screen').classList.remove('hidden');
-                    return;
-                }
-                
-                // Show dashboard
-                console.log('✨ Showing user dashboard...');
-                userDashboard.classList.remove('hidden');
-                userDashboard.style.display = 'block';
-                userDashboard.style.visibility = 'visible';
-                userDashboard.style.opacity = '1';
-                
-                // Update user name elements
-                const welcomeElement = document.getElementById('welcome-user-name');
-                const currentElement = document.getElementById('current-user-name');
-                
-                if (welcomeElement) {
-                    welcomeElement.textContent = currentUser;
-                    console.log('✅ Updated welcome-user-name:', currentUser);
-                } else {
-                    console.warn('⚠️ welcome-user-name element not found');
-                }
-                
-                if (currentElement) {
-                    currentElement.textContent = currentUser;
-                    console.log('✅ Updated current-user-name:', currentUser);
-                } else {
-                    console.warn('⚠️ current-user-name element not found');
-                }
-                
-                // Load basic user stats (simplified)
-                console.log('📊 Loading basic user stats...');
-                setTimeout(() => {
-                    try {
-                        loadUserStats();
-                        console.log('✅ User stats loaded');
-                    } catch (error) {
-                        console.warn('⚠️ Error loading user stats:', error);
-                    }
-                }, 100);
-                
-                console.log('✅ User login complete!');
-                console.log('=== LOGIN SUCCESS ===');
-                
+                loadUserData();
             } else {
-                alert('⚠️ Vui lòng nhập tên!');
+                alert('Vui lòng nhập tên!');
             }
         }
         
@@ -2993,21 +2937,82 @@
 
         async function loadCoursesFromFirebase() {
             try {
-                console.log('📚 Loading courses from Firebase...');
-                const courses = await loadFromFirebase('courses');
-                window.coursesData = courses;
-                console.log(`✅ Loaded ${courses.length} courses from Firebase`);
+                console.log('📚 Loading data from Firebase...');
                 
-                // Update UI if courses list exists
-                if (courses.length > 0) {
-                    displayCourses(courses);
-                    console.log('📊 Courses displayed in UI');
+                // Scan multiple collections like firebase-debug.html
+                const collections = ['courses', 'subjects', 'questions', 'questionSets', 'quiz-questions'];
+                let totalItems = 0;
+                let allData = [];
+                
+                for (const collectionName of collections) {
+                    try {
+                        const data = await loadFromFirebase(collectionName);
+                        if (data.length > 0) {
+                            console.log(`📚 Found ${data.length} items in ${collectionName}`);
+                            totalItems += data.length;
+                            allData.push({name: collectionName, size: data.length, data: data});
+                        }
+                    } catch (err) {
+                        console.log(`⚠️ Collection ${collectionName} not accessible:`, err.message);
+                    }
                 }
                 
-                return courses;
+                console.log(`✅ Total Firebase data: ${totalItems} items across ${allData.length} collections`);
+                window.allFirebaseData = allData;
+                
+                // Display found data in admin interface
+                if (totalItems > 0) {
+                    displayAllFirebaseData(allData);
+                }
+                
+                // Return courses for backward compatibility
+                const coursesCollection = allData.find(col => col.name === 'courses');
+                return coursesCollection ? coursesCollection.data : [];
+                
             } catch (error) {
-                console.error('❌ Error loading courses:', error);
+                console.error('❌ Error loading Firebase data:', error);
                 return [];
+            }
+        }
+        
+        function displayAllFirebaseData(allData) {
+            console.log('📊 Displaying Firebase data in admin interface...');
+            
+            // Update Firebase status indicator
+            const statusElement = document.querySelector('.firebase-status');
+            if (statusElement) {
+                statusElement.innerHTML = `� Firebase Connected (${allData.reduce((sum, col) => sum + col.size, 0)} items)`;
+                statusElement.className = 'firebase-status text-green-600';
+            }
+            
+            // Display data in courses list if available
+            const coursesList = document.getElementById('courses-list');
+            if (coursesList) {
+                coursesList.innerHTML = '<h3 class="font-bold text-lg mb-4">📚 Your Firebase Data:</h3>';
+                
+                allData.forEach(collection => {
+                    coursesList.innerHTML += `
+                        <div class="mb-4">
+                            <h4 class="font-bold text-blue-600 mb-2">📁 ${collection.name} (${collection.size} items):</h4>
+                            <div class="ml-4 space-y-2">
+                    `;
+                    
+                    collection.data.slice(0, 10).forEach((item) => {
+                        coursesList.innerHTML += `
+                            <div class="bg-gray-50 border rounded p-2 text-sm">
+                                <strong>${item.name || item.content || item.subject || 'Item'}</strong>
+                                ${item.code ? `<span class="text-gray-600"> - Code: ${item.code}</span>` : ''}
+                                ${item.difficulty ? `<span class="text-gray-600"> - ${item.difficulty}</span>` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    if (collection.size > 10) {
+                        coursesList.innerHTML += `<p class="text-gray-500 text-xs ml-2">... and ${collection.size - 10} more items</p>`;
+                    }
+                    
+                    coursesList.innerHTML += '</div></div>';
+                });
             }
         }
 
